@@ -1,0 +1,15 @@
+module compare #(
+  BITS = 16: BITS > 0
+) (
+    input v,
+    input z,
+    input n,
+    input alufn[4],
+    output alu[BITS]
+  ) {
+
+  always {
+    alu[(BITS - 1):1] = (BITS - 1)x{b0};
+    alu[0] = z & alufn[2] | (n ^ v) & alufn[1];
+  }
+}

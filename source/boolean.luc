@@ -1,0 +1,13 @@
+module boolean #(
+  BITS = 16: BITS > 0
+) (
+    input a[BITS],
+    input b[BITS],
+    input alufn[4],
+    output alu[BITS]
+  ) {
+
+  always {
+    alu = (~(a|b) & BITSx{alufn[0]}) | ((a & ~b) & BITSx{alufn[1]}) | ((b & ~a) & BITSx{alufn[2]}) | ((a&b) & BITSx{alufn[3]});
+  }
+}

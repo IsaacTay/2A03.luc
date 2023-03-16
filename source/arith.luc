@@ -1,0 +1,32 @@
+module arith #(
+  BITS = 16: BITS > 0
+) (
+    input a[BITS],
+    input b[BITS],
+    input alufn[4],
+    output alu[BITS],
+    output v,
+    output z,
+    output n
+  ) {
+  
+  sig neg_b[BITS];
+  sig s[BITS];
+
+  always {
+    neg_b = b;
+    if (alufn[0] == 1) {
+      neg_b = ~b + 1;
+    }
+    s = a + neg_b;
+    
+    alu = s;
+    if (alufn[1]) {
+      alu = a * b;
+    }
+    
+    z = ~|s;
+    v = (a[BITS-1] & neg_b[BITS-1] & ~s[BITS-1]) | (~(a[BITS-1]| neg_b[BITS-1]) & s[BITS-1]);
+    n = s[BITS-1];
+  }
+}

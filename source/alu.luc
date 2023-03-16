@@ -1,0 +1,44 @@
+module alu #(
+    BITS = 16: BITS > 0
+  )(
+    input alufn[6],
+    input a[BITS],
+    input b[BITS],
+    output alu[BITS],
+    output z,
+    output v,
+    output n
+  ) {
+  
+  sig f_z, f_v, f_n;
+  
+  .alufn(alufn[3:0]), #BITS(BITS) {
+    .a(a), .b(b) {
+      arith arith; // Arithmetic module
+      shifter shifter;  // Handles bit shifts
+      boolean boolean; // Boolean module
+    }
+    .z(f_z), .v(f_v), .n(f_n) {
+      compare compare; // Compare module
+    }
+  }
+  
+  always {
+    alu = BITSx{bx};
+    
+    f_z = arith.z;
+    f_v = arith.v;
+    f_n = arith.n;
+    
+    z = f_z;
+    v = f_v;
+    n = f_n;
+    
+    case (alufn[5:4]) {
+      b00: alu = arith.alu;
+      b10: alu = shifter.alu;
+      b01: alu = boolean.alu;
+      b11: alu = compare.alu;
+    }
+  }
+}

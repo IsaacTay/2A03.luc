@@ -1,0 +1,27 @@
+module shifter #(
+  BITS = 16: BITS > 0
+) (
+    input a[BITS],
+    input b[BITS],
+    input alufn[4],
+    output alu[BITS]
+  ) {
+  
+  const SHIFT_BITS = $clog2(BITS);
+
+  always {
+    alu = a << b[SHIFT_BITS:0];
+    if (alufn[0] == 0) {
+      alu = a >> b[SHIFT_BITS:0];
+      if (alufn[1]) { // Signed shift
+        alu = ($signed(a) >>> b[SHIFT_BITS:0]);
+      }
+    }
+    if (alufn[2]) { // circular shift
+      alu = (a >> b[SHIFT_BITS-1:0]) + (a << (BITS-b[SHIFT_BITS-1:0]));
+      if (alufn[0]) {
+        alu = (a << b[SHIFT_BITS-1:0]) + (a >> (BITS-b[SHIFT_BITS-1:0]));
+      }
+    }
+  }
+}
