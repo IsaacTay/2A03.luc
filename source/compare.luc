@@ -1,15 +1,28 @@
 module compare #(
   BITS = 16: BITS > 0
 ) (
-    input v,
-    input z,
-    input n,
+    input in_v,
+    input in_z,
+    input in_n,
+    input a[BITS],
+    input b[BITS],
     input alufn[4],
-    output alu[BITS]
+    output alu[BITS],
+    output out_v,
+    output out_z,
+    output out_n
   ) {
 
   always {
     alu[(BITS - 1):1] = (BITS - 1)x{b0};
-    alu[0] = z & alufn[2] | (n ^ v) & alufn[1];
+    alu[0] = in_z & alufn[2] | (in_n ^ in_v) & alufn[1];
+    out_z = ~|(a & b);
+    if (alufn[0]) { // alufn[0] == 1
+      out_n = b[BITS-1];
+      out_v = b[BITS-2];
+    } else {
+      out_n = a[BITS-1];
+      out_v = a[BITS-2];
+    }
   }
 }

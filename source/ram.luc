@@ -1,0 +1,70 @@
+module ram #(
+    DEPTH = 8: DEPTH > 0,
+    SIZE = 16: SIZE > 0
+  ) (
+    input clk,  // clock
+    input address[$clog2(DEPTH)],
+    input write_data[SIZE],
+    input write_en,
+    output read_data[SIZE],
+    output led_x_out[3],
+    output led_y_out[3],
+    output led_enable_out,
+    output led_color_out[3][8],
+    output fourdigit_out[14]
+  ) {
+  
+  .clk(clk), .address(address), .write_data(write_data), .write_en(write_en) {
+    simple_ram ram(#DEPTH(DEPTH), #SIZE(SIZE));
+  }
+  
+  .clk(clk) {
+    dff led_x[3]; // h2000
+    dff led_y[3]; // h2001
+    dff led_color[3][8]; // h2002 - h2004
+    dff led_enable;
+    
+    dff fourdigit[8];
+  }
+  
+  var i;
+
+  always {
+    read_data = ram.read_data;
+    
+    // Memory map logic
+    case (address) {
+      h2000: 
+        read_data = led_x.q;
+        if (write_en)
+          led_x.d = write_data;
+      h2001:
+        read_data = led_y.q;
+        if (write_en)
+          led_y.d = write_data;
+      h2005:
+        read_data = led_enable.q;
+        if (write_en)
+          led_enable.d = write_data;
+      h2006:
+        read_data = fourdigit.q;
+        if (write_en)
+          fourdigit.d = write_data;
+    }
+    
+    for (i = 0; i < 3; i++) {
+      if (address == h2002 + i) {
+        read_data = led_color.q[i];
+        if (write_en)
+          led_color.d[i] = write_data;
+      }
+    }
+    
+    // Memory out logic
+    led_x_out = led_x.q;
+    led_y_out = led_y.q;
+    led_color_out = led_color.q;
+    led_enable_out = led_enable.q;
+    fourdigit_out = fourdigit.q;
+  }
+}

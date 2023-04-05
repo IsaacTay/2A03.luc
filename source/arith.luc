@@ -4,29 +4,28 @@ module arith #(
     input a[BITS],
     input b[BITS],
     input alufn[4],
+    input in_c,
     output alu[BITS],
     output v,
-    output z,
-    output n
+    output out_c
   ) {
   
   sig neg_b[BITS];
-  sig s[BITS];
+  sig s[BITS + 1];
 
   always {
     neg_b = b;
     if (alufn[0] == 1) {
       neg_b = ~b + 1;
     }
-    s = a + neg_b;
+    s = a + neg_b + in_c;
     
-    alu = s;
+    alu = s[BITS-1:0];
     if (alufn[1]) {
       alu = a * b;
     }
     
-    z = ~|s;
     v = (a[BITS-1] & neg_b[BITS-1] & ~s[BITS-1]) | (~(a[BITS-1]| neg_b[BITS-1]) & s[BITS-1]);
-    n = s[BITS-1];
+    out_c = s[BITS];
   }
 }

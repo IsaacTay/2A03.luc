@@ -4,24 +4,31 @@ module shifter #(
     input a[BITS],
     input b[BITS],
     input alufn[4],
-    output alu[BITS]
+    input in_c,
+    output alu[BITS],
+    output out_c
   ) {
   
   const SHIFT_BITS = $clog2(BITS);
 
   always {
-    alu = a << b[SHIFT_BITS:0];
-    if (alufn[0] == 0) {
-      alu = a >> b[SHIFT_BITS:0];
-      if (alufn[1]) { // Signed shift
-        alu = ($signed(a) >>> b[SHIFT_BITS:0]);
-      }
-    }
-    if (alufn[2]) { // circular shift
-      alu = (a >> b[SHIFT_BITS-1:0]) + (a << (BITS-b[SHIFT_BITS-1:0]));
-      if (alufn[0]) {
-        alu = (a << b[SHIFT_BITS-1:0]) + (a >> (BITS-b[SHIFT_BITS-1:0]));
-      }
+    out_c = in_c;
+    case (alufn[2:0]) {
+      b000: alu = a >> b[SHIFT_BITS:0];
+      b010: alu = ($signed(a) >>> b[SHIFT_BITS:0]);
+      b100:
+        alu = c{in_c, a[BITS-1:1]};
+        out_c = a[0];
+      b101: // alu = (a << b[SHIFT_BITS-1:0]) + (a >> (BITS-b[SHIFT_BITS-1:0]))
+        alu = c{a[BITS-2:0], in_c};
+        out_c = a[BITS-1];
+      b110:
+        if (b == 0) {
+          alu = c{a[0], a[BITS-1:1]};
+        } else {
+          alu = c{a[BITS-2:0], a[BITS-1]};
+        }
+      default: alu = a << b[SHIFT_BITS:0];
     }
   }
 }

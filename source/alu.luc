@@ -2,43 +2,56 @@ module alu #(
     BITS = 16: BITS > 0
   )(
     input alufn[6],
+    input in_flags[6], // n z c i d v
     input a[BITS],
     input b[BITS],
     output alu[BITS],
-    output z,
-    output v,
-    output n
+    output out_flags[6]
   ) {
   
-  sig f_z, f_v, f_n;
+  sig n, z, v, i, d, c;
+  sig out[BITS];
   
   .alufn(alufn[3:0]), #BITS(BITS) {
     .a(a), .b(b) {
-      arith arith; // Arithmetic module
-      shifter shifter;  // Handles bit shifts
+      .in_c(in_flags[3]) {
+        arith arith; // Arithmetic module
+        shifter shifter;  // Handles bit shifts
+      }
       boolean boolean; // Boolean module
-    }
-    .z(f_z), .v(f_v), .n(f_n) {
-      compare compare; // Compare module
+      
+      .in_z(in_flags[4]), .in_v(in_flags[0]), .in_n(in_flags[5]) {
+        compare compare; // Compare module
+      }
     }
   }
   
   always {
-    alu = BITSx{bx};
+    out = BITSx{0};
     
-    f_z = arith.z;
-    f_v = arith.v;
-    f_n = arith.n;
-    
-    z = f_z;
-    v = f_v;
-    n = f_n;
+    n = 0;
+    z = 0;
+    v = 0;
+    i = 0;
+    d = 0;
+    c = 0;
     
     case (alufn[5:4]) {
-      b00: alu = arith.alu;
-      b10: alu = shifter.alu;
-      b01: alu = boolean.alu;
-      b11: alu = compare.alu;
+      b00:
+        out = arith.alu;
+        c = arith.out_c;
+        v = arith.v;
+      b10:
+        out = shifter.alu;
+        c = shifter.out_c;
+      b01: out = boolean.alu;
+      b11: out = compare.alu;
     }
+    
+    n = out[BITS-1];
+    z = ~|out;
+    
+    alu = out;
+    out_flags = c{n, z, c, i, d, v};
   }
 }
