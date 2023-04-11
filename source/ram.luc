@@ -6,12 +6,16 @@ module ram #(
     input address[$clog2(DEPTH)],
     input write_data[SIZE],
     input write_en,
+    input io_button[5],
+    input irq_clear,
     output read_data[SIZE],
     output led_x_out[3],
     output led_y_out[3],
     output led_enable_out,
     output led_color_out[3][8],
-    output fourdigit_out[14]
+    output fourdigit_out[13],
+    output onedigit_out[4],
+    output interrupt
   ) {
   
   .clk(clk), .address(address), .write_data(write_data), .write_en(write_en) {
@@ -25,36 +29,72 @@ module ram #(
     dff led_enable;
     
     dff fourdigit[8];
+    dff onedigit[4];
+    
+    dff buttons[5];
+    dff irq;
+    
+    dff map_data[8], map_toggle;
   }
   
   var i;
 
-  always {
+  always {    
     read_data = ram.read_data;
+    if (map_toggle.q) {
+      read_data = map_data.q;
+      map_toggle.d = 0;
+    }
+    
+    // Memory in logic
+    if (io_button > 0) {
+      irq.d = 1;
+      interrupt = 1;
+      buttons.d = buttons.q | io_button;
+    }
+    if (irq_clear) {
+      irq.d = 0;
+      interrupt = 0;
+    }
     
     // Memory map logic
     case (address) {
       h2000: 
-        read_data = led_x.q;
+        map_data.d = led_x.q;
+        map_toggle.d = 1;
         if (write_en)
           led_x.d = write_data;
       h2001:
-        read_data = led_y.q;
+        map_data.d = led_y.q;
+        map_toggle.d = 1;
         if (write_en)
           led_y.d = write_data;
       h2005:
-        read_data = led_enable.q;
+        map_data.d = led_enable.q;
+        map_toggle.d = 1;
         if (write_en)
           led_enable.d = write_data;
       h2006:
-        read_data = fourdigit.q;
+        map_data.d = fourdigit.q;
+        map_toggle.d = 1;
         if (write_en)
           fourdigit.d = write_data;
+      h2007:
+        map_data.d = onedigit.q;
+        map_toggle.d = 1;
+        if (write_en)
+          onedigit.d = write_data;
+      h4016:
+        map_data.d = buttons.q;
+        map_toggle.d = 1;
+        if (write_en)
+          buttons.d = write_data;
     }
     
     for (i = 0; i < 3; i++) {
       if (address == h2002 + i) {
-        read_data = led_color.q[i];
+        map_data.d = led_color.q[i];
+        map_toggle.d = 1;
         if (write_en)
           led_color.d[i] = write_data;
       }
@@ -66,5 +106,8 @@ module ram #(
     led_color_out = led_color.q;
     led_enable_out = led_enable.q;
     fourdigit_out = fourdigit.q;
+    onedigit_out = onedigit.q;
+    
+    interrupt = irq.q;
   }
 }

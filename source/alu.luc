@@ -45,11 +45,18 @@ module alu #(
         out = shifter.alu;
         c = shifter.out_c;
       b01: out = boolean.alu;
-      b11: out = compare.alu;
+      b11:
+        out = compare.alu;
+        v = compare.out_v;
     }
     
     n = out[BITS-1];
     z = ~|out;
+    
+    if (alufn[5:4] == b11) {
+        n = compare.out_n;
+        z = compare.out_z;
+    }
     
     alu = out;
     out_flags = c{n, z, c, i, d, v};
