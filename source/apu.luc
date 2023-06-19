@@ -1,0 +1,252 @@
+module apu (
+    input clk,  // clock
+    input channel_rst[4],
+    input frame_rst,
+    input in[22][8],
+    output interrupt,
+    output out[8]
+  ) {
+  
+  .clk(clk) {
+    .inc(1) {
+      idff cpu_clk(#MAX(56));
+    }
+    idff apu_clk(#MAX(2));
+    dff frame_counter[13];
+    
+    dff sequence[3];
+    dff length_counter[4][8];
+    dff timer[5][11];
+    
+    // Combinations
+    dff divider[3][4];
+    dff decay[3][4];
+    
+    // Pulse
+    dff sequencer[2][4];
+    
+    // Triangle
+    dff tri_sequencer[6];
+    dff linear_counter[7];
+    dff reload_flag;
+    
+    // Noise
+    dff shift_register[15](#INIT(1));
+  }
+  
+  const BASE12 = {8d32, 8d16, 8d72, 8d192, 8d96, 8d48, 8d24, 8d12};
+  const BASE10 = {8d26, 8d14, 8d60, 8d160, 8d80, 8d40, 8d20, 8d10};
+  
+  const PULSE_SEQUENCE = $reverse({
+    $reverse({0, 0, 0, 0, 0, 0, 0, 1}),
+    $reverse({0, 0, 0, 0, 0, 0, 1, 1}),
+    $reverse({0, 0, 0, 0, 1, 1, 1, 1}),
+    $reverse({1, 1, 1, 1, 1, 1, 0, 0})
+  });
+    
+  const PERIOD = $reverse({11d2, 11d4, 11d8, 11d16, 11d32, 11d48, 11d64, 11d80, 11d101, 11d127, 11d190, 11d254, 11d381, 11d508, 11d1017, 11d2034});
+  
+  var i;
+  
+  sig lc_in[2][5], lc_out[2][8];
+  
+  sig pulse_volume[2][4], noise_volume[4];
+  sig pulse[2][8], pulse_sum[9], pulse_out[8];
+  sig tnd_out[8], tnd_sum[8];
+  sig tri_out[4], noise_out[8];
+  
+  sig quarter_frame, half_frame;
+
+  always {
+    out = 0;
+    interrupt = 0;
+    
+    apu_clk.inc = cpu_clk.c;
+    
+    quarter_frame = 0;
+    half_frame = 0;
+    frame_counter.d = frame_counter.q + cpu_clk.c;
+    if (frame_counter.q == 7457) {
+      frame_counter.d = 0;
+      sequence.d = sequence.q + 1;
+      
+      case (sequence.q + 1) {
+        1: quarter_frame = 1;
+        2:
+          quarter_frame = 1;
+          half_frame = 1;
+        2: quarter_frame = 1;
+        4:
+          if (in[21][7] == 0) {
+            quarter_frame = 1;
+            half_frame = 1;
+            sequence.d = 0;
+          }
+        5:
+          quarter_frame = 1;
+          half_frame = 1;
+          sequence.d = 0;
+      }
+    }
+    
+    if (frame_rst) {
+      frame_counter.d = 0;
+      sequence.d = 0;
+    }
+    
+    if (quarter_frame) {
+      for (i = 0; i < 2; i++) {
+        if (!in[i * 4][4]) {
+          divider.d[i] = divider.q[i] - 1;
+          if (divider.q[i] == 0) {
+            divider.d[i] = in[i*4][3:0];
+            decay.d[i] = decay.q[i] - 1;
+            if (decay.q[i] == 0) {
+              decay.d[i] = 0;
+              if (in[i * 4][6]) // Unless loop is specified
+                decay.d[i] = 16;
+            }
+          }
+        }
+      }
+      
+      if (!in[3 * 4][4]) {
+        divider.d[2] = divider.q[2] - 1;
+        if (divider.q[2] == 0) {
+          divider.d[2] = in[3*4][3:0];
+          decay.d[2] = decay.q[2] - 1;
+          if (decay.q[2] == 0) {
+            decay.d[2] = 0;
+            if (in[3 * 4][6]) // Unless loop is specified
+              decay.d[2] = 16;
+          }
+        }
+      }
+    }
+    
+    if (half_frame) {
+      for (i = 0; i < 2; i++) {
+        if (!in[i * 4][6])
+          length_counter.d[i] = length_counter.q[i] - 1;
+        if (length_counter.q[i] == 0) {
+          length_counter.d[i] = 0;
+        }
+      }
+      
+      if (!in[2 * 4][7]) {
+        if (in[2 * 4] != h7f)
+          length_counter.d[2] = length_counter.q[2] -1;
+        if (length_counter.q[2] == 0) {
+          length_counter.d[2] = 0;
+        }
+        reload_flag.d = 0;
+      }
+      if (reload_flag.q)
+        linear_counter.d = in[2 * 4][6:0];
+      
+      if (!in[3 * 4][6])
+        length_counter.d[3] = length_counter.q[3] - 1;
+      if (length_counter.q[3] == 0) {
+        length_counter.d[3] = 0;
+      }
+    }
+    
+    for (i = 0; i < 2; i++) {
+      timer.d[i] = timer.q[i] - apu_clk.c;
+      if (timer.q[i] == 0) {
+        timer.d[i] = c{in[i * 4 + 3][2:0], in[i * 4 + 2]};
+        sequencer.d[i] = sequencer.q[i] - 1;
+      }
+    }
+    timer.d[2] = timer.q[2] - cpu_clk.c;
+    if (timer.q[2] == 0) {
+      timer.d[2] = c{in[2 * 4 + 2][2:0], in[2 * 4 + 2]};
+      if (length_counter.q[2] != 0 && linear_counter.q != 0) {
+        tri_sequencer.d = tri_sequencer.q - 1;
+      }
+      
+    }
+    timer.d[3] = timer.q[3] - apu_clk.c;
+    if (timer.q[3] == 0) {
+      timer.d[3] = PERIOD[in[3 * 4 + 2][3:0]];
+      shift_register.d[13:0] = shift_register.q >> 1;
+      shift_register.d[14] = shift_register.q[0] ^ shift_register.q[0];
+      if (in[3 * 4 + 2][7])
+        shift_register.d[14] = shift_register.q[0] ^ shift_register.q[6];
+    }
+    
+    for (i = 0; i < 2; i++) {
+      pulse_volume[i] = decay.q[i];
+      if (in[i * 4][4])
+        pulse_volume[i] = in[i*4][3:0];
+    }
+    noise_volume = in[3*4][3:0];
+    if (in[3*4][4])
+      noise_volume = decay.q[2];
+    
+    // Enables/Resets
+    for (i = 0; i < 4; i++) {
+      if (!in[20][i])
+        length_counter.d[i] = 0;
+    }
+    for (i = 0; i < 2; i++) {
+      lc_in[i] = 0;
+      lc_out[i] = 0;
+      if (channel_rst[i]) {
+        decay.d[i] = 15;
+        divider.d[i] = in[i*4][3:0];
+        lc_in[i] = in[i * 4 + 3][7:3];
+        if (lc_in[i][0]) {
+          // Linear length values
+          lc_out[i] = lc_in[i][4:1] * 2;
+          if (lc_in[i][4:1] == 0) {
+            lc_out[i] = 254;
+          }
+        } else if (lc_in[i][4] == 1) {
+          // Base 12 lengths
+          lc_out[i] = BASE12[lc_in[i][3:1]];
+        } else {
+          // Base 10 lengths
+          lc_out[i] = BASE10[lc_in[i][3:1]];
+        }
+        length_counter.d[i] = lc_out[i];
+        decay.d[i] = 16;
+        sequencer.d[i] = 0;
+      }
+    }
+    if (channel_rst[2]) {
+      reload_flag.d = 0;
+    }
+    if (channel_rst[3]) {
+      decay.d[2] = 15;
+      divider.d[2] = in[3*4][3:0];
+    }
+    
+    // Mixer
+    for (i = 0; i < 2; i++) {
+      pulse[i] = 0;
+      if (length_counter.q[i] != 0) {
+        pulse[i] = PULSE_SEQUENCE[in[i * 4][7:6]][sequencer.q[i]] * pulse_volume[i];
+      }
+    }
+    pulse_sum = pulse[0] + pulse[1];
+    pulse_out = 0;
+    if (pulse_sum != 0) {
+      pulse_out = (96 * 16) / ((8128 / pulse_sum) + 100);
+    }
+    tri_out = tri_sequencer.q[3:0];
+    if (tri_sequencer.q[4])
+      tri_out = 15 - tri_sequencer.q[3:0];
+    noise_out = 0;
+    if (length_counter.q[3] != 0 && shift_register.q[0]) {
+      noise_out = noise_volume;
+    }
+    tnd_sum = 3 * tri_out + 2 * noise_out;
+    tnd_out = 0;
+    if (tnd_sum != 0) {
+      tnd_out = (96 * 16) / ((8128 / tnd_sum) + 100);
+    }
+    out = pulse_out + tnd_out;
+  }
+}
+

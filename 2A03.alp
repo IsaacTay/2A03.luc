@@ -1,14 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project name="2A03" board="Alchitry Au" language="Lucid" version="3">
   <files>
-    <component>simple_dual_ram.v</component>
     <src>shifter.luc</src>
     <component>pipeline.luc</component>
     <src>segment_display.luc</src>
+    <component>uart_rx.luc</component>
     <src>ram.luc</src>
     <component>counter.luc</component>
     <src>alu.luc</src>
     <src>idff.luc</src>
+    <component>uart_tx.luc</component>
+    <component>pn_gen.luc</component>
     <src>led_matrix.luc</src>
     <component>simple_ram.v</component>
     <src>boolean.luc</src>
@@ -18,9 +20,12 @@
     <src top="true">au_top.luc</src>
     <src>arith.luc</src>
     <component>button_conditioner.luc</component>
+    <src>apu.luc</src>
+    <constraint>audio.acf</constraint>
     <constraint lib="true">alchitry.acf</constraint>
     <constraint>led_matrix.acf</constraint>
     <constraint lib="true">io.acf</constraint>
     <constraint lib="true">au.xdc</constraint>
+    <constraint>onedigit.acf</constraint>
   </files>
 </project>

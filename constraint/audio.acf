@@ -1,0 +1,4 @@
+pin audio[0] C46;
+pin audio[1] C45;
+pin audio[2] C5;
+pin audio[3] C6;

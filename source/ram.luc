@@ -15,6 +15,9 @@ module ram #(
     output led_color_out[3][8],
     output fourdigit_out[13],
     output onedigit_out[4],
+    output audio_out[22][8],
+    output channel_rst[4],
+    output frame_rst,
     output interrupt
   ) {
   
@@ -35,16 +38,29 @@ module ram #(
     dff irq;
     
     dff map_data[8], map_toggle;
+    
+    dff audio[22][8];
+    
+    dff channel_rst_buf[4];
+    dff frame_rst_buf;
+    
+    .rst(0), .next(1), .seed(32h62592c62) {
+      pn_gen rand;
+    }
   }
   
-  var i;
+  const ROM = $reverse({
+h4c,h66,h06,h48,h8a,h48,h98,h48,had,h16,h40,ha2,h00,h8e,h16,h40,ha6,h04,he0,h01,hd0,h1c,h4a,h90,h03,h20,h48,h06,h4a,h90,h03,h20,h5a,h06,h4a,h4a,h90,h03,h20,h3f,h06,h4a,h90,h03,h20,h51,h06,h4c,h39,h06,h4a,h4a,h90,h4f,h20,h60,h06,h68,ha8,h68,haa,h68,h40,h48,ha5,h03,h09,h01,h85,h03,h68,h60,h48,ha5,h03,h09,h02,h85,h03,h68,h60,h48,ha5,h03,h09,h04,h85,h03,h68,h60,ha2,hff,h9a,h4c,h66,h06,ha2,hff,h9a,h4c,hda,h06,h78,ha9,h00,h85,h03,h85,hfd,h85,hfe,h85,h04,ha9,h01,h8d,h07,h20,h58,h86,hfe,ha5,hfd,h18,h65,hfe,hc9,h08,h30,h03,h18,he9,h08,h85,hfe,ha9,h00,h8d,h05,h20,h8d,h03,h20,h8d,h04,h20,h8d,h02,h20,h8c,h01,h20,h8e,h00,h20,ha5,hfe,h4c,hc9,h07,ha9,h01,h8d,h05,h20,he6,hfe,ha5,hfe,hc9,h08,hd0,h04,ha9,h00,h85,hfe,hc8,hc0,h08,hd0,hd1,ha0,h00,he8,he0,h08,hd0,hb9,ha2,h00,h20,h9c,h07,h20,h9c,h07,h20,h9c,h07,h20,h9c,h07,he6,hfd,ha5,hfd,hc9,h08,hd0,ha3,ha9,h00,h85,hfd,h4c,h76,h06,h78,ha9,h00,h8d,h06,h20,ha9,h01,had,hda,h06,h58,ha9,h00,h20,h9c,h07,ha6,h05,he8,he0,hff,hd0,h03,hee,h07,h20,h18,h6d,h07,h20,hc9,h0f,h30,heb,h78,ha2,h00,ha5,hff,h4a,h46,h03,h08,h76,h00,hb0,h0f,h28,hb0,h06,h20,hb5,h07,h4c,h28,h07,h20,hbc,h07,h4c,h28,h07,h28,h90,h06,h20,hb5,h07,h4c,h28,h07,h20,hbc,h07,h4c,h28,h07,he8,he0,h03,hd0,hd3,h20,h33,h07,h4c,he5,h06,h48,h8a,h48,h98,h48,ha2,h00,ha0,h00,ha5,h03,h85,hfd,h95,h00,h48,ha9,h00,h8d,h05,h20,h8e,h00,h20,h8c,h01,h20,h8d,h03,h20,h8d,h04,h20,h8d,h02,h20,h68,h46,hfd,h4a,h90,h14,h48,ha9,h05,h46,hfd,h90,h06,h8d,h04,h20,h4c,h82,h07,h8d,h02,h20,h68,h4c,h82,h07,h48,ha9,h05,h46,hfd,hb0,h03,h4c,h82,h07,h8d,h03,h20,h68,h4c,h82,h07,h48,ha9,h01,h8d,h05,h20,h68,hc8,hc0,h08,hd0,hb4,he8,hc0,h08,hf0,h03,h4c,h33,h07,h68,ha8,h68,haa,h68,h60,h48,h98,h48,ha0,h00,ha9,h00,hc8,hc0,hff,hd0,hfb,ha8,hc8,h98,ha0,h00,hc9,hff,hd0,hf2,h68,ha8,h68,h60,hee,h06,h20,hee,h06,h20,h60,h48,had,h06,h20,hc9,h00,hf0,h03,hce,h06,h20,h68,h60,he0,h00,hd0,h03,h8d,h03,h20,he0,h01,hd0,h06,h8d,h04,h20,h8d,h02,h20,he0,h02,hd0,h06,h8d,h02,h20,h8d,h03,h20,he0,h03,hd0,h03,h8d,h04,h20,he0,h04,hd0,h03,h8d,h04,h20,he0,h05,hd0,h06,h8d,h02,h20,h8d,h03,h20,he0,h06,hd0,h06,h8d,h04,h20,h8d,h03,h20,he0,h07,hd0,h03,h8d,h02,h20,h4c,ha0,h06
+  });
 
-  always {    
+  always {
     read_data = ram.read_data;
     if (map_toggle.q) {
       read_data = map_data.q;
       map_toggle.d = 0;
     }
+    
+    channel_rst_buf.d = 0;
     
     // Memory in logic
     if (io_button > 0) {
@@ -59,6 +75,9 @@ module ram #(
     
     // Memory map logic
     case (address) {
+      h00ff:
+        map_data.d = rand.num;
+        map_toggle.d = 1;
       h2000: 
         map_data.d = led_x.q;
         map_toggle.d = 1;
@@ -91,14 +110,46 @@ module ram #(
           buttons.d = write_data;
     }
     
-    for (i = 0; i < 3; i++) {
-      if (address == h2002 + i) {
-        map_data.d = led_color.q[i];
-        map_toggle.d = 1;
-        if (write_en)
-          led_color.d[i] = write_data;
+    if (address >= h2002 && address <= h2004) {
+      map_data.d = led_color.q[address - h2002];
+      map_toggle.d = 1;
+      if (write_en)
+        led_color.d[address - h2002] = write_data;
+    }
+    
+    if (address >= h0600 && address < h1000) {
+      map_data.d = ROM[address - h0600];
+      map_toggle.d = 1;
+    }
+    
+    if (address >= h4000 && address < h4014) {
+      if (write_en)
+        audio.d[address - h4000] = write_data;
+      
+      if (write_en) {
+        if (address == h4003)
+          channel_rst_buf.d[0] = 1;
+        else if (address == h4007)
+          channel_rst_buf.d[1] = 1;
+        else if (address == h400b)
+          channel_rst_buf.d[2] = 1;
+        else if (address == h400f)
+          channel_rst_buf.d[3] = 1;
       }
     }
+    if (address == h4015) {
+      if (write_en)
+        audio.d[20] = write_data; 
+    }
+    frame_rst_buf.d = 0;
+    if (address == h4017) {
+      if (write_en)
+         frame_rst_buf.d = 1;
+        audio.d[21] = write_data;
+    }
+    
+    frame_rst = frame_rst_buf.q;
+    channel_rst = channel_rst_buf.q;
     
     // Memory out logic
     led_x_out = led_x.q;
@@ -107,6 +158,7 @@ module ram #(
     led_enable_out = led_enable.q;
     fourdigit_out = fourdigit.q;
     onedigit_out = onedigit.q;
+    audio_out = audio.q;
     
     interrupt = irq.q;
   }

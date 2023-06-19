@@ -1,0 +1,25 @@
+module idff #(
+    MAX = 2: MAX > 0
+  ) (
+    input clk,  // clock
+    input inc,
+    output q[$clog2(MAX)],
+    output c
+  ) {
+  
+  const BITS = $clog2(MAX);
+  
+  .clk(clk) {
+    dff value[BITS];
+  }
+
+  always {
+    q = value.q;
+    c = 0;
+    value.d = value.q + inc;
+    if (value.q + inc == MAX) {
+      value.d = 0;
+      c = 1;
+    }
+  }
+}

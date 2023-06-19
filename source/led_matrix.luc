@@ -1,0 +1,64 @@
+module led_matrix #(
+    WIDTH = 8: WIDTH > 0,
+    HEIGHT = 8: HEIGHT > 0
+  ) (
+    input clk,  // clock
+    input color[24],
+    input x[$clog2(WIDTH)],
+    input y[$clog2(HEIGHT)],
+    input we,
+    output out
+  ) {
+  
+  .clk(clk) {
+    dff image[WIDTH][HEIGHT][24];
+    dff current_color[24];
+    dff rest(#INIT(1));
+    
+    idff current_x(#MAX(WIDTH));
+    idff current_y(#MAX(HEIGHT));
+    idff bit(#MAX(24));
+    
+    idff ticks(#MAX(125)); // Cycles last for 1.25us
+    idff rest_ctr(#MAX(5005));
+    
+    edge_detector bit_down(#RISE(0), #FALL(1));
+  }
+
+  always {
+    out = 0;
+    
+    if (we) {
+      image.d[x][y] = color;
+    }
+    
+    rest_ctr.inc = rest.q;
+    ticks.inc = ~rest.q;
+    bit.inc = ticks.c;
+    current_x.inc = bit.c;
+    current_y.inc = current_x.c;
+    
+    bit_down.in = bit.c;
+    
+    if (bit_down.out) {
+      current_color.d = image.q[current_x.q][current_y.q];
+    }
+    
+    if (current_y.c) {
+      rest.d = 1;
+    }
+    
+    if ((current_color.q[23 - bit.q] && ticks.q < 80) || (~current_color.q[23 - bit.q] && ticks.q < 40)) {
+      out = 1;
+    }
+    
+    if (rest.q) {
+      out = 0;
+    }
+    
+    if (rest_ctr.c) {
+      rest.d = 0;
+    }
+    
+  }
+}
